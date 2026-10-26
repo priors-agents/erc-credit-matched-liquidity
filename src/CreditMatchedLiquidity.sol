@@ -94,10 +94,10 @@ interface IERC165 {
 ///         Unwinding settles at the feed's price and never sends the base token through this contract, so a transfer
 ///         registry that blocks it cannot strand a position. When no price has come for the hand-over delay past the
 ///         due date, or a day after the base stopped trading for good, the position is handed over without a price:
-///         the lender takes the quote, up to what is owed, and the position token. A position with nothing owed is
-///         never unwound or handed over. Prices are bounded by `MAX_PRICE` and every product of a price and an amount
-///         is computed in 512 bits; every movement of the quote token is counted by the balance that changed, not the
-///         amount requested.
+///         the lender takes the quote, up to what is owed, and the position token if that quote falls short; if it
+///         does not, the position token goes to the holder. A position with nothing owed is never unwound or handed
+///         over. Prices are bounded by `MAX_PRICE` and every product of a price and an amount is computed in 512 bits;
+///         every movement of the quote token is counted by the balance that changed, not the amount requested.
 /// @dev Not audited. A reference for the interface, written against mocks. Never deploy without an external audit.
 /// @custom:security Not audited. Never deploy without an external audit.
 contract CreditMatchedLiquidity is ICreditMatchedLiquidity, IERC165 {
@@ -418,15 +418,18 @@ contract CreditMatchedLiquidity is ICreditMatchedLiquidity, IERC165 {
         emit PositionUnwound(positionId, recovered, owed - recovered);
     }
 
-    /// @dev Settles without a price: the lender takes the quote, up to what is owed, and the position token at its
-    ///      fallback address, with all the base still owed to it, the holder's part included. No base token moves.
+    /// @dev Settles without a price: the lender takes the quote, up to what is owed. If that covers what is owed, the
+    ///      rest is the holder's, which needs no price to tell, and the position token goes to the holder, as after an
+    ///      unwind at a price. If not, the base cannot be split without a price, and the lender takes the position
+    ///      token at its fallback address, with all the base still owed to it, the holder's part included. No base
+    ///      token moves.
     function _handOver(uint256 positionId, Position storage p) private {
         uint256 owed = p.owed;
         uint256 tokenId = p.tokenId;
         p.owed = 0;
         p.status = Status.HandedOver;
         (uint256 recovered,) = _withdrawQuote(tokenId, owed);
-        _manager.transferFrom(address(this), _fallback, tokenId);
+        _manager.transferFrom(address(this), recovered == owed ? p.holder : _fallback, tokenId);
         emit PositionHandedOver(positionId, recovered, owed - recovered);
     }
 

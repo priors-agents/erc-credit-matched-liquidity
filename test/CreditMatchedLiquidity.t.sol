@@ -823,6 +823,58 @@ contract CreditMatchedLiquidityTest is Test {
         cml.close(id);
     }
 
+    /// @dev The base traded up through the range before the feed went silent, so the position sits mostly in quote. The
+    ///      quote covers what is owed: the lender is paid in full and the rest, base and quote, is the holder's, which
+    ///      needs no price to tell. The position token goes to the holder, as after an unwind at a price.
+    function test_handover_quoteCoversOwed_theHolderKeepsThePositionToken() public {
+        uint256 id = _open(); // the feed answers now, and never again
+        _poolPrice(300); // worth 27,386.13 quote and 91.287 base at the pool's 300
+        vm.warp(cml.position(id).dueAt + HANDOVER);
+        uint256 lenderBefore = quote.balanceOf(address(cml));
+        vm.recordLogs();
+        vm.prank(stranger);
+        cml.unwind(id);
+
+        (bytes32 topic, uint256 recovered, uint256 outstanding) = _unwindLog();
+        assertEq(topic, ICreditMatchedLiquidity.PositionHandedOver.selector);
+        assertEq(recovered, 25_250e6);
+        assertEq(outstanding, 0);
+        assertEq(quote.balanceOf(address(cml)) - lenderBefore, 25_250e6);
+        assertEq(pm.ownerOf(_tokenId(id)), holder);
+        (uint256 owedBase, uint256 owedQuote) = _owedInToken(id);
+        assertApproxEqRel(owedBase, 91.287e18, TOL);
+        assertApproxEqRel(owedQuote, 2_136.13e6, TOL);
+        assertEq(base.balanceOf(fallbackAddr), 0);
+        assertEq(uint8(cml.position(id).status), uint8(ICreditMatchedLiquidity.Status.HandedOver));
+    }
+
+    /// @dev The same for a terminal status. Pushing the pool's price back down before the call makes the quote fall
+    ///      short, and the lender then takes the position token whole: what every hand-over gave it before.
+    function test_handover_terminal_quoteCoversOwed_unlessThePoolIsPushedDown() public {
+        uint256 covered = _open();
+        uint256 pushed = _open();
+        _poolPrice(300);
+        uint64 since = uint64(block.timestamp);
+        market.set(TERMINAL, since);
+        vm.warp(since + GRACE);
+        vm.recordLogs();
+        cml.unwind(covered);
+        (, uint256 recovered, uint256 outstanding) = _unwindLog();
+        assertEq(recovered, 25_250e6);
+        assertEq(outstanding, 0);
+        assertEq(pm.ownerOf(_tokenId(covered)), holder);
+
+        _poolPrice(250); // someone sells base into the pool first: 25,000 quote, 250 short
+        vm.recordLogs();
+        cml.unwind(pushed);
+        (, recovered, outstanding) = _unwindLog();
+        assertApproxEqRel(recovered, 25_000e6, TOL);
+        assertEq(recovered + outstanding, 25_250e6);
+        assertEq(pm.ownerOf(_tokenId(pushed)), fallbackAddr);
+        (uint256 owedBase,) = _owedInToken(pushed);
+        assertApproxEqRel(owedBase, 100e18, TOL);
+    }
+
     function test_handover_aFeedThatIsLateIsNotSilent_oneThatAnswersNothingUsableIs() public {
         uint256 late = _open();
         uint256 broken = _open();

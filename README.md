@@ -20,7 +20,8 @@ status that tells a session break from a halt and from a delisting or a redempti
 fees repaid it in full is never unwound. The third revision (2026-10-22) takes in Zealynx's follow-up there: the 14-day
 floor on the hand-over delay is a MUST, as the reference already enforced, and a terminal status hands a position over
 only a day (`TERMINAL_GRACE`) after the `since` its source reports, so that a holder who is watching can still close,
-which needs no price, and keep its part.
+which needs no price, and keep its part. The fourth revision (2026-10-26) takes in his next point: a hand-over whose
+quote covers what is owed gives the position token to the holder, not to the lender.
 
 ## Why
 

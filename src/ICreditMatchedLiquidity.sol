@@ -92,6 +92,7 @@ interface ICreditMatchedLiquidity {
 
     /// @notice Withdraws the position and settles it at the feed's price, the lender first. Anyone, once unwindable.
     ///         Without a usable price, once a hand-over is due, it gives the lender the quote, up to what is owed, and
-    ///         the position token. Never for a position with nothing owed.
+    ///         the position token if that quote falls short; otherwise the holder gets the position token. Never for a
+    ///         position with nothing owed.
     function unwind(uint256 positionId) external;
 }
