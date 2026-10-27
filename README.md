@@ -1,4 +1,4 @@
-# Credit-Matched Liquidity (draft ERC)
+# ERC-8465: Credit-Matched Liquidity (draft)
 
 > **Not audited. Never deploy without an external audit.** The contracts in `src/` are a reference for a draft
 > interface, written against mocks. Nobody outside their authors has reviewed them, and they must not hold real funds.
@@ -12,9 +12,8 @@ cannot strand a position: the lender's share goes to a fallback address it names
 position token.
 
 **Status: draft, submitted as [ethereum/ERCs#2109](https://github.com/ethereum/ERCs/pull/2109).** The text is in
-[`ERCS/erc-draft_credit_matched_liquidity.md`](ERCS/erc-draft_credit_matched_liquidity.md). Its `eip: 99908` is a
-placeholder until the ERC editors assign a number. Discussion: [Ethereum
-Magicians](https://ethereum-magicians.org/t/erc-tba-credit-matched-liquidity/30039). The second revision (2026-10-21)
+[`ERCS/erc-8465.md`](ERCS/erc-8465.md). The editors assigned it ERC-8465 on 2026-10-27. Discussion: [Ethereum
+Magicians](https://ethereum-magicians.org/t/erc-8465-credit-matched-liquidity/30039). The second revision (2026-10-21)
 takes in the review there by Zealynx: a timed hand-over to the lender when no price comes past the due date, a trading
 status that tells a session break from a halt and from a delisting or a redemption, and a fix so that a position whose
 fees repaid it in full is never unwound. The third revision (2026-10-22) takes in Zealynx's follow-up there: the 14-day
@@ -49,7 +48,7 @@ implementation reads a reduced trading-status interface, `ITradingStatus`, that 
 
 | Path | What |
 |---|---|
-| `ERCS/erc-draft_credit_matched_liquidity.md` | The ERC text, in the ethereum/ERCs template |
+| `ERCS/erc-8465.md` | The ERC text, in the ethereum/ERCs template |
 | `src/ICreditMatchedLiquidity.sol` | The interface |
 | `src/CreditMatchedLiquidity.sol` | A reference escrow and lender, one lender per contract (not audited; never deploy without an external audit) |
 | `test/CreditMatchedLiquidity.t.sol` | Foundry tests of the reference against the specification, including manipulated pool prices, stale and closed-market prices, halts, delistings and hand-overs, blocked transfers, a quote token that charges on transfer, token and feed decimals from 0 to 18, and prices at the bounds |
