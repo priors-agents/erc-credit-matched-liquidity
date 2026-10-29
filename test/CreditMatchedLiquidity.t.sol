@@ -1253,6 +1253,54 @@ contract CreditMatchedLiquidityTest is Test {
         assertEq(shortfall, 0);
     }
 
+    function test_charge_roundsUp() public {
+        vm.prank(holder);
+        uint256 id = cml.open(pool, 100e18, 24_999_999_999, LOW, HIGH, AGENT);
+        assertEq(cml.position(id).quoteLent, 24_999_999_999);
+        // 1% of 24,999.999999 is 249.99999999: the charge rounds up to 250.
+        assertEq(cml.position(id).owed, 25_249_999_999);
+    }
+
+    function test_price_roundsDown_toQuoteUnitsPer1e18BaseUnits() public {
+        uint256 id = _open();
+        feed.set(7_712_345_678, block.timestamp); // 77.12345678, from the feed of 8 decimals
+        (uint256 before,,) = cml.health(id);
+        pm.addFees(_tokenId(id), 100e18, 0); // 100 base credited to the position token
+        (uint256 value,,) = cml.health(id);
+        // P = 7,712,345,678 * 10^(18 + 6) / 10^(8 + 18) = 77,123,456.78, rounded down to 77,123,456: the 100 base
+        // add exactly 7,712.3456 quote, not 7,712.345678.
+        assertEq(value - before, 7_712_345_600);
+    }
+
+    function test_unwindLine_isExact_toTheUnit() public {
+        uint256 id = _open();
+        _oracle(77); // 50,000 * sqrt(77 / 250) = 27,748.87, below the line of 1.1 * 25,250 = 27,775
+        (uint256 value,, bool unwindable) = cml.health(id);
+        assertApproxEqRel(value, 27_748.87e6, TOL);
+        assertTrue(unwindable);
+
+        // valueInQuote * 10000 < 25,250e6 * 11000 exactly when valueInQuote < 27,775e6. Quote credited to the
+        // position token counts at par, so fees can bring the value to any unit.
+        uint256 line = 27_775e6;
+        pm.addFees(_tokenId(id), 0, line - 1 - value);
+        (value,, unwindable) = cml.health(id);
+        assertEq(value, line - 1);
+        assertTrue(unwindable);
+        uint256 snapshot = vm.snapshotState();
+        vm.prank(stranger);
+        cml.unwind(id);
+        assertEq(uint8(cml.position(id).status), uint8(ICreditMatchedLiquidity.Status.Unwound));
+        vm.revertToState(snapshot);
+
+        pm.addFees(_tokenId(id), 0, 1); // one unit more: on the line, not below it
+        (value,, unwindable) = cml.health(id);
+        assertEq(value, line);
+        assertFalse(unwindable);
+        vm.prank(stranger);
+        vm.expectRevert(CreditMatchedLiquidity.NotUnwindable.selector);
+        cml.unwind(id);
+    }
+
     // ------------------------------------------------------------- decimals and price bounds
 
     struct Kit {
